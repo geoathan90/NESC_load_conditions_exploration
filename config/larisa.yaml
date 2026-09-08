@@ -1,0 +1,14 @@
+region:
+  name: Larisa
+  north: 40.25
+  south: 39.25
+  west: 21.75
+  east: 22.75
+  crs: EPSG:4326
+
+era5:
+  months: [12, 1, 2]
+  variables: [t2m, d2m, ptype, tcslw, lcc, cbh, fg10, avg_tprate, avg_tsrwe]
+
+storage:
+  data_root_env: NESC_DATA_ROOT
