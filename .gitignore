@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+.env
+
+# Large/local datasets and generated outputs
+data/
+local_data/
+derived/
+*.nc
+*.nc4
+*.grib
+*.grb
+*.grib2
+*.tif
+*.tiff
+*.zip
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
