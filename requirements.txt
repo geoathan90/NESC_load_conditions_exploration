@@ -1,0 +1,11 @@
+numpy
+pandas
+xarray
+netCDF4
+rioxarray
+rasterio
+scipy
+matplotlib
+PyYAML
+dask[array]
+pytest
