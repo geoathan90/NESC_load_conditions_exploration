@@ -1,3 +1,4 @@
 # Documentation
 
-Technical notes, methodology references, variable definitions, data-source provenance, and workflow decisions can be recorded here. The user's primary methodology DOCX is maintained separately.
+- [`methodology.md`](methodology.md): numerical definitions, denominators, time
+  continuity, validation contract and known interpretation limits.

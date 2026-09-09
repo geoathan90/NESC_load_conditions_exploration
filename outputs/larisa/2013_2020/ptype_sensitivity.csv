@@ -1,0 +1,16 @@
+category,minimum_precip_rate_mmh,count_grid_cell_hours,unfiltered_category_count,pct_of_unfiltered_category_retained,pct_of_all_valid_grid_cell_hours
+freezing_rain,0,831,831,100,0.1918282548
+freezing_rain,0.01,325,831,39.10950662,0.07502308403
+freezing_rain,0.1,101,831,12.15403129,0.02331486611
+freezing_drizzle,0,0,0,,0
+freezing_drizzle,0.01,0,0,,0
+freezing_drizzle,0.1,0,0,,0
+freezing_liquid,0,831,831,100,0.1918282548
+freezing_liquid,0.01,325,831,39.10950662,0.07502308403
+freezing_liquid,0.1,101,831,12.15403129,0.02331486611
+wet_snow,0,9273,9273,100,2.140581717
+wet_snow,0.01,6445,9273,69.50285776,1.487765466
+wet_snow,0.1,3930,9273,42.38110644,0.9072022161
+accretion_relevant,0,10104,10104,100,2.332409972
+accretion_relevant,0.01,6770,10104,67.00316706,1.56278855
+accretion_relevant,0.1,4031,10104,39.89509105,0.9305170822
