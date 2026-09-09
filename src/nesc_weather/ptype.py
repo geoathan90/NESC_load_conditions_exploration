@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import xarray as xr
 
-# ECMWF GRIB2 Code Table 4.201. Codes 9--11 are reserved.
+# ECMWF GRIB2 Code Table 4.201.
 PTYPE_LABELS: dict[int, str] = {
     0: "no_precipitation",
     1: "rain",

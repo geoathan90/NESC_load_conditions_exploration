@@ -9,7 +9,21 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .statistics import ANALYSIS_VARIABLES
+
+VARIABLE_LABELS = {
+    "t2m_c": "2 m temperature (t2m_c)",
+    "dewpoint_depression_c": "Dewpoint depression (t2m_c - d2m_c)",
+    "precip_rate_mmh": "Total precipitation rate (precip_rate_mmh)",
+    "snowfall_rate_mmh": "Snowfall rate, water equivalent (snowfall_rate_mmh)",
+    "fg10": "10 m gust (fg10)",
+    "low_cloud_cover_pct": "Low cloud cover (lcc)",
+    "tcslw": "Total column supercooled liquid water (tcslw)",
+    "cbh": "Cloud base height (cbh)",
+}
+
+LOWER_TAIL_VARIABLES = ("t2m_c", "dewpoint_depression_c", "cbh")
+UPPER_TAIL_VARIABLES = ("precip_rate_mmh", "snowfall_rate_mmh", "fg10", "tcslw")
+CONDITIONAL_FOCUS = ("freezing_liquid", "wet_snow", "accretion_relevant")
 
 
 def _fmt(value: object, decimals: int = 3) -> str:
@@ -33,6 +47,108 @@ def _table(headers: list[str], rows: list[list[object]]) -> str:
     return "\n".join(lines)
 
 
+def _stat_row(
+    conditional: pd.DataFrame, condition: str, variable: str
+) -> pd.Series:
+    matches = conditional[
+        (conditional["condition"] == condition)
+        & (conditional["variable"] == variable)
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"Expected exactly one conditional-statistics row for "
+            f"{condition}/{variable}; found {len(matches)}"
+        )
+    return matches.iloc[0]
+
+
+def _lower_tail_rows(
+    conditional: pd.DataFrame, conditions: tuple[str, ...]
+) -> list[list[object]]:
+    rows: list[list[object]] = []
+    for condition in conditions:
+        for variable in LOWER_TAIL_VARIABLES:
+            row = _stat_row(conditional, condition, variable)
+            rows.append(
+                [
+                    condition,
+                    VARIABLE_LABELS[variable],
+                    row.units,
+                    int(row["count"]),
+                    int(row.missing_count),
+                    row["mean"],
+                    row["median"],
+                    row.p25,
+                    row.p05,
+                    row["min"],
+                ]
+            )
+    return rows
+
+
+def _upper_tail_rows(
+    conditional: pd.DataFrame, conditions: tuple[str, ...]
+) -> list[list[object]]:
+    rows: list[list[object]] = []
+    for condition in conditions:
+        for variable in UPPER_TAIL_VARIABLES:
+            row = _stat_row(conditional, condition, variable)
+            rows.append(
+                [
+                    condition,
+                    VARIABLE_LABELS[variable],
+                    row.units,
+                    int(row["count"]),
+                    int(row.missing_count),
+                    row["mean"],
+                    row["median"],
+                    row.p90,
+                    row.p95,
+                    row.p99,
+                    row["max"],
+                ]
+            )
+    return rows
+
+
+def _cloud_cover_rows(
+    conditional: pd.DataFrame, conditions: tuple[str, ...]
+) -> list[list[object]]:
+    rows: list[list[object]] = []
+    for condition in conditions:
+        row = _stat_row(conditional, condition, "low_cloud_cover_pct")
+        rows.append(
+            [
+                condition,
+                int(row["count"]),
+                int(row.missing_count),
+                row["mean"],
+                row["median"],
+                row.p75,
+                row.p90,
+            ]
+        )
+    return rows
+
+
+def _event_rows(events: pd.DataFrame) -> list[list[object]]:
+    return [
+        [
+            f"{row.latitude:.2f}, {row.longitude:.2f}",
+            row.start,
+            int(row.duration_hours),
+            row.ptype_labels,
+            row.temperature_min_c,
+            row.temperature_mean_c,
+            row.gust_max_ms,
+            row.precipitation_water_equivalent_mm,
+            row.snowfall_water_equivalent_mm,
+            row.tcslw_max_kgm2,
+        ]
+        for row in events.itertuples()
+    ]
+
+
 def write_numerical_report(
     path: Path,
     *,
@@ -52,7 +168,9 @@ def write_numerical_report(
 
     years = sorted(set(pd.DatetimeIndex(ds.valid_time.values).year))
     times = pd.DatetimeIndex(ds.valid_time.values)
-    cell_hours = int(ds.sizes["valid_time"] * ds.sizes["latitude"] * ds.sizes["longitude"])
+    cell_hours = int(
+        ds.sizes["valid_time"] * ds.sizes["latitude"] * ds.sizes["longitude"]
+    )
     region_name = config["region"]["name"]
     raw_variables = list(config["era5"]["variables"])
     derived_variables = [
@@ -68,15 +186,16 @@ def write_numerical_report(
         "",
         "## Scope",
         "",
-        "This is the first repeatable numerical exploration of the available January, "
-        "February and December observations. The eight-year archive is suitable for "
+        "This is a repeatable numerical exploration of the available January, "
+        f"February and December observations. The {len(years)}-year archive is suitable for "
         "pipeline development and exploratory comparison, but not for a final NESC "
         "loading-zone classification, design adequacy conclusion, or climatological equivalence claim.",
         "",
         "All percentages labelled **all hours** use valid grid-cell-hours as the denominator. "
-        "Percentages labelled **ptype precipitation** use valid observations with ECMWF "
-        "`ptype != 0` as the denominator. No spatial averaging is performed before the "
-        "per-cell metrics are calculated.",
+        "Percentages labelled **ptype-classified precipitation** use valid observations with ECMWF "
+        "`ptype != 0` as the denominator. That is a categorical model denominator, not a guarantee "
+        "of physically meaningful precipitation at a non-trace rate. No spatial averaging is "
+        "performed before the per-cell metrics are calculated.",
         "",
         "## A. Dataset QA",
         "",
@@ -84,14 +203,34 @@ def write_numerical_report(
             ["Item", "Result"],
             [
                 ["Years", f"{years[0]}–{years[-1]} ({len(years)} years)"],
-                ["Selected months", ", ".join(str(month) for month in sorted(config["era5"]["months"]))],
+                [
+                    "Selected months",
+                    ", ".join(
+                        str(month) for month in sorted(config["era5"]["months"])
+                    ),
+                ],
                 ["Unique timestamps", len(times)],
-                ["Grid", f"{ds.sizes['latitude']} latitude × {ds.sizes['longitude']} longitude"],
+                [
+                    "Grid",
+                    f"{ds.sizes['latitude']} latitude × {ds.sizes['longitude']} longitude",
+                ],
                 ["Grid-cell-hours", cell_hours],
-                ["Latitude coordinates", ", ".join(f"{value:g}" for value in ds.latitude.values)],
-                ["Longitude coordinates", ", ".join(f"{value:g}" for value in ds.longitude.values)],
-                ["Validated source files", f"{int(manifest.validation_passed.sum())}/{len(manifest)}"],
-                ["Unexpected within-month hourly gaps", int(manifest.unexpected_within_month_gaps.sum())],
+                [
+                    "Latitude coordinates",
+                    ", ".join(f"{value:g}" for value in ds.latitude.values),
+                ],
+                [
+                    "Longitude coordinates",
+                    ", ".join(f"{value:g}" for value in ds.longitude.values),
+                ],
+                [
+                    "Validated source files",
+                    f"{int(manifest.validation_passed.sum())}/{len(manifest)}",
+                ],
+                [
+                    "Unexpected within-month hourly gaps",
+                    int(manifest.unexpected_within_month_gaps.sum()),
+                ],
             ],
         ),
         "",
@@ -99,31 +238,40 @@ def write_numerical_report(
         "calendar month; the March–November interval is intentionally absent.",
         "",
     ]
+
     annual_rows = []
     for year, group in manifest.groupby("year"):
         annual_rows.append(
             [
                 str(year),
                 int(group.timestamp_count.iloc[0]),
-                group.continuous_time_segments.iloc[0].replace(";", "; ").replace("..", " → "),
+                group.continuous_time_segments.iloc[0]
+                .replace(";", "; ")
+                .replace("..", " → "),
                 bool(group.hourly_coverage_passed.all()),
             ]
         )
     lines.extend(
         [
-            _table(["Year", "Timestamps", "Observed hourly segments", "Coverage valid"], annual_rows),
+            _table(
+                ["Year", "Timestamps", "Observed hourly segments", "Coverage valid"],
+                annual_rows,
+            ),
             "",
             "Missing values are counted across the full time × latitude × longitude population.",
             "",
         ]
     )
+
     missing_rows = []
     for variable in raw_variables + derived_variables:
         missing = int(ds[variable].isnull().sum().item())
         missing_rows.append([variable, missing, 100.0 * missing / cell_hours])
     lines.extend(
         [
-            _table(["Variable", "Missing grid-cell-hours", "Missing (%)"], missing_rows),
+            _table(
+                ["Variable", "Missing grid-cell-hours", "Missing (%)"], missing_rows
+            ),
             "",
             "Validation result: all required files, variables, timestamps and grids aligned "
             "exactly across instant/avg/max packages and across years.",
@@ -132,33 +280,80 @@ def write_numerical_report(
             "",
         ]
     )
+
     cold_rows = [
         [row.metric, int(row.count_grid_cell_hours), row.percentage]
         for row in cold.itertuples()
     ]
     lines.extend(
         [
-            _table(["Temperature frequency", "Grid-cell-hours", "Percent"], cold_rows),
+            "### Cold-frequency context",
             "",
-        ]
-    )
-    all_stats = conditional[conditional.condition == "all_winter"]
-    general_rows = []
-    for row in all_stats.itertuples():
-        general_rows.append(
-            [row.variable, row.units, int(row.count), int(row.missing_count), row.mean, row.median, row.p95, row.p99, row.max]
-        )
-    lines.extend(
-        [
             _table(
-                ["Variable", "Units", "Valid", "Missing", "Mean", "Median", "P95", "P99", "Max"],
-                general_rows,
+                ["Temperature frequency", "Grid-cell-hours", "Percent"], cold_rows
+            ),
+            "",
+            "### Cold / saturation / low-cloud-base tail",
+            "",
+            "For temperature, dewpoint depression and cloud-base height, the lower tail is "
+            "the engineering-relevant direction. The report therefore foregrounds P25, P05 "
+            "and the minimum rather than the warm/dry/high-cloud upper tail.",
+            "",
+            _table(
+                [
+                    "Condition",
+                    "Variable",
+                    "Units",
+                    "Valid",
+                    "Missing",
+                    "Mean",
+                    "Median",
+                    "P25",
+                    "P05",
+                    "Min",
+                ],
+                _lower_tail_rows(conditional, ("all_winter",)),
+            ),
+            "",
+            "### Wind / precipitation / supercooled-water upper tail",
+            "",
+            "For wind gust, precipitation rates and TCSLW, larger values represent the "
+            "severity direction of interest, so upper percentiles and maxima are retained. "
+            "All-winter precipitation-rate statistics include dry hours; conditional event "
+            "statistics below are more representative of intensity during relevant weather.",
+            "",
+            _table(
+                [
+                    "Condition",
+                    "Variable",
+                    "Units",
+                    "Valid",
+                    "Missing",
+                    "Mean",
+                    "Median",
+                    "P90",
+                    "P95",
+                    "P99",
+                    "Max",
+                ],
+                _upper_tail_rows(conditional, ("all_winter",)),
+            ),
+            "",
+            "### Low-cloud-cover distribution",
+            "",
+            "Low-cloud cover is bounded at 100%, so repeated P95/P99/max values of 100% add "
+            "little information. The report instead shows the central and upper-middle distribution.",
+            "",
+            _table(
+                ["Condition", "Valid", "Missing", "Mean", "Median", "P75", "P90"],
+                _cloud_cover_rows(conditional, ("all_winter",)),
             ),
             "",
             "## C. Precipitation-type occurrence",
             "",
         ]
     )
+
     occurrence_rows = []
     for row in occurrence.itertuples():
         occurrence_rows.append(
@@ -174,7 +369,14 @@ def write_numerical_report(
     lines.extend(
         [
             _table(
-                ["Category", "Code(s)", "Count", "% all hours", "Count in ptype precip", "% ptype precip"],
+                [
+                    "Category",
+                    "Code(s)",
+                    "Count",
+                    "% all hours",
+                    "Count in ptype-classified precip",
+                    "% ptype-classified precip",
+                ],
                 occurrence_rows,
             ),
             "",
@@ -188,13 +390,24 @@ def write_numerical_report(
             "",
         ]
     )
+
     sensitivity_focus = sensitivity[sensitivity.category == "accretion_relevant"]
     lines.extend(
         [
             _table(
-                ["Minimum precip rate (mm/h)", "Retained count", "% retained", "% all hours"],
                 [
-                    [row.minimum_precip_rate_mmh, int(row.count_grid_cell_hours), row.pct_of_unfiltered_category_retained, row.pct_of_all_valid_grid_cell_hours]
+                    "Minimum precip rate (mm/h)",
+                    "Retained count",
+                    "% retained",
+                    "% all hours",
+                ],
+                [
+                    [
+                        row.minimum_precip_rate_mmh,
+                        int(row.count_grid_cell_hours),
+                        row.pct_of_unfiltered_category_retained,
+                        row.pct_of_all_valid_grid_cell_hours,
+                    ]
                     for row in sensitivity_focus.itertuples()
                 ],
             ),
@@ -204,7 +417,13 @@ def write_numerical_report(
             _table(
                 ["Category", "Diagnostic", "Count", "Category total", "Percent"],
                 [
-                    [row.category, row.diagnostic, int(row.count_grid_cell_hours), int(row.category_grid_cell_hours), row.percentage_of_category]
+                    [
+                        row.category,
+                        row.diagnostic,
+                        int(row.count_grid_cell_hours),
+                        int(row.category_grid_cell_hours),
+                        row.percentage_of_category,
+                    ]
                     for row in ptype_diagnostic.itertuples()
                 ],
             ),
@@ -216,29 +435,71 @@ def write_numerical_report(
             "",
             "## D. Conditional icing-relevant statistics",
             "",
-        ]
-    )
-    conditional_rows = []
-    for row in conditional.itertuples():
-        conditional_rows.append(
-            [row.condition, row.variable, row.units, int(row.count), int(row.missing_count), row.mean, row.median, row.p95, row.p99, row.max]
-        )
-    lines.extend(
-        [
+            "### Thermodynamic and cloud-base context",
+            "",
             _table(
-                ["Condition", "Variable", "Units", "Valid", "Missing", "Mean", "Median", "P95", "P99", "Max"],
-                conditional_rows,
+                [
+                    "Condition",
+                    "Variable",
+                    "Units",
+                    "Valid",
+                    "Missing",
+                    "Mean",
+                    "Median",
+                    "P25",
+                    "P05",
+                    "Min",
+                ],
+                _lower_tail_rows(conditional, CONDITIONAL_FOCUS),
+            ),
+            "",
+            "Temperature maxima are intentionally not foregrounded here; unusually warm "
+            "ptype flags are already exposed in the diagnostic table above.",
+            "",
+            "### Loading / intensity / supercooled-water severity",
+            "",
+            _table(
+                [
+                    "Condition",
+                    "Variable",
+                    "Units",
+                    "Valid",
+                    "Missing",
+                    "Mean",
+                    "Median",
+                    "P90",
+                    "P95",
+                    "P99",
+                    "Max",
+                ],
+                _upper_tail_rows(conditional, CONDITIONAL_FOCUS),
+            ),
+            "",
+            "### Low-cloud-cover context",
+            "",
+            _table(
+                ["Condition", "Valid", "Missing", "Mean", "Median", "P75", "P90"],
+                _cloud_cover_rows(conditional, CONDITIONAL_FOCUS),
             ),
             "",
             "## E. Spatial statistics",
             "",
             "Each metric is first computed independently at each grid cell. The following "
-            "summarizes those 25 cell-level results across the domain.",
+            "summarizes those cell-level results across the domain. For cold, saturation "
+            "and low-cloud-base metrics, smaller values are generally the more severe/relevant "
+            "direction; for gust, precipitation and TCSLW, larger values are the severity direction.",
             "",
             _table(
                 ["Per-cell metric", "Cells", "Minimum", "Median", "Mean", "Maximum"],
                 [
-                    [row.metric, int(row.cell_count), row.domain_min, row.domain_median, row.domain_mean, row.domain_max]
+                    [
+                        row.metric,
+                        int(row.cell_count),
+                        row.domain_min,
+                        row.domain_median,
+                        row.domain_mean,
+                        row.domain_max,
+                    ]
                     for row in spatial.itertuples()
                 ],
             ),
@@ -247,10 +508,40 @@ def write_numerical_report(
             "",
         ]
     )
+
     if events.empty:
         lines.append("No accretion-relevant grid-cell events were detected.")
     else:
         multi_hour = int((events.duration_hours >= 2).sum())
+        event_headers = [
+            "Cell",
+            "Start",
+            "Hours",
+            "ptype",
+            "T min °C",
+            "T mean °C",
+            "Gust max m/s",
+            "Precip mm",
+            "Snowfall mm w.e.",
+            "TCSLW max kg/m²",
+        ]
+        longest = events.sort_values(
+            ["duration_hours", "gust_max_ms", "start"],
+            ascending=[False, False, True],
+        ).head(10)
+        gustiest = events.sort_values(
+            ["gust_max_ms", "duration_hours", "start"],
+            ascending=[False, False, True],
+        ).head(10)
+        highest_tcslw = events.sort_values(
+            ["tcslw_max_kgm2", "duration_hours", "start"],
+            ascending=[False, False, True],
+        ).head(10)
+        freezing_liquid = events[events["freezing_liquid_hours"] > 0].sort_values(
+            ["duration_hours", "gust_max_ms", "start"],
+            ascending=[False, False, True],
+        ).head(10)
+
         lines.extend(
             [
                 f"Detected **{len(events):,}** individual grid-cell events, of which "
@@ -258,20 +549,32 @@ def write_numerical_report(
                 "whenever the next actual timestamp is not exactly one hour later, so the "
                 "March–November archive gap cannot join two episodes.",
                 "",
-                _table(
-                    ["Cell", "Start", "Hours", "ptype", "T mean °C", "Gust max m/s", "Precip mm", "Snowfall mm w.e.", "TCSLW max kg/m²"],
-                    [
-                        [
-                            f"{row.latitude:.2f}, {row.longitude:.2f}", row.start,
-                            int(row.duration_hours), row.ptype_labels, row.temperature_mean_c,
-                            row.gust_max_ms, row.precipitation_water_equivalent_mm,
-                            row.snowfall_water_equivalent_mm, row.tcslw_max_kgm2,
-                        ]
-                        for row in events.head(10).itertuples()
-                    ],
+                "The event catalogue is shown through several rankings because the longest "
+                "episode is not necessarily the most severe by wind, liquid-water availability, "
+                "or freezing-liquid mechanism.",
+                "",
+                "### Longest accretion-relevant events",
+                "",
+                _table(event_headers, _event_rows(longest)),
+                "",
+                "### Highest gust during accretion-relevant events",
+                "",
+                _table(event_headers, _event_rows(gustiest)),
+                "",
+                "### Highest TCSLW during accretion-relevant events",
+                "",
+                _table(event_headers, _event_rows(highest_tcslw)),
+                "",
+                "### Freezing-liquid events",
+                "",
+                (
+                    _table(event_headers, _event_rows(freezing_liquid))
+                    if not freezing_liquid.empty
+                    else "No freezing-liquid events were detected."
                 ),
             ]
         )
+
     lines.extend(
         [
             "",
@@ -285,7 +588,7 @@ def write_numerical_report(
             "",
             "- Missing cloud-base height remains missing rather than being imputed; it commonly indicates that a meaningful cloud base is unavailable for that sample.",
             "",
-            "- The minimum derived dewpoint depression is slightly below zero (about -0.003 °C), a negligible packing/rounding artefact retained rather than clipped.",
+            "- The minimum derived dewpoint depression can be slightly below zero because of packing/rounding; such tiny negative values are retained rather than clipped.",
             "",
             "- ECMWF describes `ptype` as an instantaneous diagnostic to be used with precipitation rate. In this archive, many flagged observations coincide with trace or zero interval-mean precipitation, so unfiltered event counts should not be read as verified accretion hours.",
             "",

@@ -31,7 +31,18 @@ def numeric_summary(values: np.ndarray) -> dict[str, float | int]:
         "count": int(finite.size),
         "missing_count": int(array.size - finite.size),
     }
-    names = ("min", "p05", "p25", "median", "mean", "p75", "p90", "p95", "p99", "max")
+    names = (
+        "min",
+        "p05",
+        "p25",
+        "median",
+        "mean",
+        "p75",
+        "p90",
+        "p95",
+        "p99",
+        "max",
+    )
     if finite.size == 0:
         result.update({name: np.nan for name in names})
         result["std"] = np.nan
@@ -240,14 +251,35 @@ def per_grid_cell_summary(
             }
             for variable in ANALYSIS_VARIABLES:
                 summary = numeric_summary(cell[variable].values)
-                for statistic in ("mean", "median", "p05", "p95", "p99", "min", "max"):
+                for statistic in (
+                    "mean",
+                    "median",
+                    "p05",
+                    "p25",
+                    "p75",
+                    "p90",
+                    "p95",
+                    "p99",
+                    "min",
+                    "max",
+                ):
                     row[f"{variable}_{statistic}"] = summary[statistic]
                 row[f"{variable}_missing_count"] = summary["missing_count"]
             for threshold in (0.0, -5.0, -10.0):
                 count = int((cell["t2m_c"] <= threshold).sum().item())
                 label = str(int(abs(threshold))) if threshold != 0 else "0"
-                row[f"t2m_at_or_below_minus_{label}_c_count" if threshold < 0 else "t2m_at_or_below_0_c_count"] = count
-                row[f"t2m_at_or_below_minus_{label}_c_pct" if threshold < 0 else "t2m_at_or_below_0_c_pct"] = 100.0 * count / temperature_denominator
+                count_key = (
+                    f"t2m_at_or_below_minus_{label}_c_count"
+                    if threshold < 0
+                    else "t2m_at_or_below_0_c_count"
+                )
+                pct_key = (
+                    f"t2m_at_or_below_minus_{label}_c_pct"
+                    if threshold < 0
+                    else "t2m_at_or_below_0_c_pct"
+                )
+                row[count_key] = count
+                row[pct_key] = 100.0 * count / temperature_denominator
             for group in (
                 "freezing_rain",
                 "freezing_drizzle",
@@ -261,26 +293,54 @@ def per_grid_cell_summary(
             rows.append(row)
     result = pd.DataFrame(rows)
     if event_counts is not None and not event_counts.empty:
-        result = result.merge(event_counts, on=["latitude", "longitude"], how="left")
+        result = result.merge(
+            event_counts, on=["latitude", "longitude"], how="left"
+        )
         for column in ("event_count", "maximum_event_duration_hours"):
             result[column] = result[column].fillna(0).astype(int)
-    return result.sort_values(["latitude", "longitude"], ascending=[False, True])
+    return result.sort_values(
+        ["latitude", "longitude"], ascending=[False, True]
+    )
 
 
 def spatial_domain_summary(cells: pd.DataFrame) -> pd.DataFrame:
-    """Summarize selected per-cell metrics across the domain."""
+    """Summarize engineering-relevant per-cell metrics across the domain."""
 
     metrics = [
+        # Temperature: preserve mean context but foreground the cold tail.
         "t2m_c_mean",
+        "t2m_c_p05",
+        "t2m_c_min",
         "t2m_at_or_below_0_c_pct",
         "t2m_at_or_below_minus_5_c_pct",
         "t2m_at_or_below_minus_10_c_pct",
+        # Moisture/cloud context: lower dewpoint depression and cloud base are relevant.
+        "dewpoint_depression_c_median",
+        "dewpoint_depression_c_p05",
+        "dewpoint_depression_c_min",
+        "cbh_median",
+        "cbh_p25",
+        "cbh_p05",
+        "low_cloud_cover_pct_mean",
+        "low_cloud_cover_pct_p75",
+        "low_cloud_cover_pct_p90",
+        # Upper-tail loading/severity metrics.
         "fg10_p95",
+        "fg10_p99",
         "fg10_max",
         "precip_rate_mmh_mean",
+        "precip_rate_mmh_p95",
+        "precip_rate_mmh_p99",
         "precip_rate_mmh_max",
+        "snowfall_rate_mmh_mean",
+        "snowfall_rate_mmh_p95",
+        "snowfall_rate_mmh_p99",
+        "snowfall_rate_mmh_max",
         "tcslw_mean",
+        "tcslw_p95",
+        "tcslw_p99",
         "tcslw_max",
+        # Occurrence/event metrics.
         "freezing_liquid_pct_all_hours",
         "wet_snow_pct_all_hours",
         "accretion_relevant_pct_all_hours",
