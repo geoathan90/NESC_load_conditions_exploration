@@ -9,3 +9,4 @@ matplotlib
 PyYAML
 dask[array]
 pytest
+gdown
