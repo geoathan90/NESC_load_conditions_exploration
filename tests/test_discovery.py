@@ -13,14 +13,14 @@ FILES = {
 
 
 def test_discovers_complete_year_directories(tmp_path: Path) -> None:
-    for year in (2013, 2014):
+    for year in (2012, 2013, 2014):
         directory = tmp_path / str(year)
         directory.mkdir()
         for filename in FILES.values():
             (directory / filename).touch()
     (tmp_path / "notes").mkdir()
     result = discover_year_files(tmp_path, FILES)
-    assert list(result) == [2013, 2014]
+    assert list(result) == [2012, 2013, 2014]
     assert result[2014]["max"].name == "max.nc"
 
 

@@ -30,7 +30,13 @@ REGION = {
 }
 
 
-def _write_year(tmp_path: Path, misalign_max: bool = False) -> dict[str, Path]:
+def _write_year(
+    tmp_path: Path,
+    year: int = 2013,
+    misalign_max: bool = False,
+    ) -> dict[str, Path]:
+
+    times = expected_hourly_times(year, ERA5["months"])
     times = expected_hourly_times(2013, ERA5["months"])
     lat = [40.25, 40.0, 39.75, 39.5, 39.25]
     lon = [21.75, 22.0, 22.25, 22.5, 22.75]
@@ -110,3 +116,22 @@ def test_validation_merges_exactly_aligned_step_types(tmp_path: Path) -> None:
 def test_validation_rejects_step_type_grid_misalignment(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="bound mismatch|not aligned"):
         validate_and_merge_year(2013, _write_year(tmp_path, misalign_max=True), ERA5, REGION)
+
+def test_validation_accepts_2012_leap_year(tmp_path: Path) -> None:
+    merged, rows = validate_and_merge_year(
+        2012,
+        _write_year(tmp_path, year=2012),
+        ERA5,
+        REGION,
+    )
+
+    times = pd.DatetimeIndex(merged.valid_time.values)
+
+    assert len(times) == 2184
+    assert pd.Timestamp("2012-02-29 00:00:00") in times
+    assert times[0] == pd.Timestamp("2012-01-01 00:00:00")
+    assert times[-1] == pd.Timestamp("2012-12-31 23:00:00")
+
+    assert len(rows) == 3
+    assert all(row["timestamp_count"] == 2184 for row in rows)
+    assert all(row["validation_passed"] for row in rows)

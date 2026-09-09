@@ -1,0 +1,4 @@
+metric,threshold_c,count_grid_cell_hours,denominator_grid_cell_hours,percentage
+t2m_at_or_below_0_c,0,58459,487800,11.98421484
+t2m_at_or_below_-5_c,-5,7204,487800,1.476834768
+t2m_at_or_below_-10_c,-10,745,487800,0.1527265273

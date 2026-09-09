@@ -1,4 +1,7 @@
 year,filename,drive_id,relative_path,local_path,local_exists,local_size_bytes
+2012,data_stream-oper_stepType-avg.nc,1EAwNW1bgqH8G1qoApMFCusBTajLDIbhh,2012/data_stream-oper_stepType-avg.nc,2012/data_stream-oper_stepType-avg.nc,True,265046
+2012,data_stream-oper_stepType-instant.nc,1pEkxkqqIjo-AbLAmJrwOgfODa7d1js98,2012/data_stream-oper_stepType-instant.nc,2012/data_stream-oper_stepType-instant.nc,True,744706
+2012,data_stream-oper_stepType-max.nc,1qxMr6X25WgCvRyHaNiw4nkNc8atwKY91,2012/data_stream-oper_stepType-max.nc,2012/data_stream-oper_stepType-max.nc,True,316301
 2013,data_stream-oper_stepType-avg.nc,1XOMae1hBNMS65SkD_7aum7RF4A5haKQT,2013/data_stream-oper_stepType-avg.nc,2013/data_stream-oper_stepType-avg.nc,True,244685
 2013,data_stream-oper_stepType-instant.nc,1K0G-pQJ5QtkUjnNkhOyL4rstYAvyybHl,2013/data_stream-oper_stepType-instant.nc,2013/data_stream-oper_stepType-instant.nc,True,749671
 2013,data_stream-oper_stepType-max.nc,1LTdkRwv9URDE1lNm88LKyEs22C0sU8kf,2013/data_stream-oper_stepType-max.nc,2013/data_stream-oper_stepType-max.nc,True,313285
