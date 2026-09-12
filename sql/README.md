@@ -1,5 +1,12 @@
 # SQL analysis
 
+If I make a mistake and need to start fresh:
+
+rm local_data/nesc_weather.db
+sqlite3 local_data/nesc_weather.db < sql/schema.sql
+
+_________
+
 This directory is reserved for readable SQL queries against the generated SQLite weather database.
 
 Planned progression:
