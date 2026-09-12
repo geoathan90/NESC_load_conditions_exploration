@@ -19,6 +19,9 @@ derived/
 *.tif
 *.tiff
 *.zip
+*.db
+*.sqlite
+*.sqlite3
 
 # OS/editor
 .DS_Store

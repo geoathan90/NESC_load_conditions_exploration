@@ -1,0 +1,13 @@
+{
+  "region": "montana",
+  "display_name": "Montana",
+  "years": {"start": 1991, "end": 2020},
+  "months": [1, 2, 12],
+  "area": {"north": 50.0, "west": -118.0, "south": 45.0, "east": -111.0},
+  "file_groups": {
+    "instant": ["t2m", "d2m", "tcslw", "lcc", "cbh"],
+    "ptype": ["ptype"],
+    "avg": ["avg_tprate", "avg_tsrwe"],
+    "max": ["fg10"]
+  }
+}

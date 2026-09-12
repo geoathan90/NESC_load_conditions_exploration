@@ -1,0 +1,7 @@
+numpy==2.5.3
+pandas==3.0.5
+xarray==2026.7.0
+h5netcdf==1.8.1
+h5py==3.16.0
+gdown==6.2.0
+pytest==9.1.1
