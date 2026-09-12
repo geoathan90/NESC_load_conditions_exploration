@@ -1,8 +1,0 @@
-category,diagnostic,count_grid_cell_hours,category_grid_cell_hours,percentage_of_category
-freezing_liquid,zero_interval_mean_precip_rate,98,831,11.79302046
-freezing_liquid,precip_rate_below_0.01_mmh,506,831,60.89049338
-freezing_liquid,t2m_above_0_c,424,831,51.02286402
-freezing_liquid,t2m_above_2_c,36,831,4.332129964
-wet_snow,zero_interval_mean_precip_rate,897,9273,9.673244905
-wet_snow,precip_rate_below_0.01_mmh,2828,9273,30.49714224
-wet_snow,t2m_above_5_c,148,9273,1.596031489
