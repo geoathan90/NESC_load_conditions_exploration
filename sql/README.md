@@ -3,7 +3,7 @@
 If I make a mistake and need to start fresh:
 
 rm local_data/nesc_weather.db
-sqlite3 local_data/nesc_weather.db < sql/schema.sql
+sqlite3 local_data/nesc_weather.db < sql/0_schema.sql
 
 _________
 
