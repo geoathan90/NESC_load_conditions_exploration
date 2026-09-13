@@ -4,6 +4,12 @@
 Run from the repository root:
     python scripts/calculate_kpis.py
 
+Wet-snow sensitivity examples:
+    python scripts/calculate_kpis.py --wet-snow-temp-max-c 0
+    python scripts/calculate_kpis.py --wet-snow-temp-max-c 1
+    python scripts/calculate_kpis.py --wet-snow-temp-max-c 2
+    python scripts/calculate_kpis.py --wet-snow-temp-max-c 3
+
 Default outputs:
     derived/kpis/kpi_comparison.csv
     derived/kpis/kpi_long.csv
@@ -99,6 +105,10 @@ class Acc:
     wet_all: int = 0
     wet: int = 0
     wet_high: int = 0
+    wet_le_0: int = 0
+    wet_0_to_1: int = 0
+    wet_1_to_2: int = 0
+    wet_gt_2: int = 0
     wet_swe_s: Stats = field(default_factory=Stats)
     wet_swe_q: Q = field(default_factory=Q)
     wet_precip_s: Stats = field(default_factory=Stats)
@@ -150,9 +160,17 @@ M = (
     Metric("1A Freezing liquid", "fr_temp_min", "Minimum temperature", "degC", "qualifying freezing-liquid cell-hours", "minimum T2m"),
 
     Metric("1B Wet snow", "wet_all", "Wet-snow ptype cell-hours, all temperatures", "cell-hours", "all DJF grid-cell-hours", "ptype = 6, before temperature filtering"),
-    Metric("1B Wet snow", "wet", "Qualifying cold wet-snow cell-hours", "cell-hours", "all DJF grid-cell-hours", "ptype = 6 and T2m <= freezing threshold"),
+    Metric("1B Wet snow", "wet", "Qualifying wet-snow cell-hours", "cell-hours", "all DJF grid-cell-hours", "ptype = 6 and T2m <= wet-snow temperature threshold"),
     Metric("1B Wet snow", "wet_pct", "Qualifying wet-snow share", "%", "all DJF grid-cell-hours", "qualifying wet snow / all grid-cell-hours"),
-    Metric("1B Wet snow", "wet_pct_ptype", "Cold share of wet-snow ptype", "%", "ptype 6 cell-hours", "qualifying / all ptype 6"),
+    Metric("1B Wet snow", "wet_pct_ptype", "Qualifying share of wet-snow ptype", "%", "ptype 6 cell-hours", "qualifying / all ptype 6"),
+    Metric("1B Wet snow", "wet_le_0", "Wet-snow cell-hours at T2m <= 0 C", "cell-hours", "ptype 6 cell-hours", "ptype = 6 and T2m <= 0 C"),
+    Metric("1B Wet snow", "wet_0_to_1", "Wet-snow cell-hours at 0 < T2m <= 1 C", "cell-hours", "ptype 6 cell-hours", "ptype = 6 and 0 < T2m <= 1 C"),
+    Metric("1B Wet snow", "wet_1_to_2", "Wet-snow cell-hours at 1 < T2m <= 2 C", "cell-hours", "ptype 6 cell-hours", "ptype = 6 and 1 < T2m <= 2 C"),
+    Metric("1B Wet snow", "wet_gt_2", "Wet-snow cell-hours at T2m > 2 C", "cell-hours", "ptype 6 cell-hours", "ptype = 6 and T2m > 2 C"),
+    Metric("1B Wet snow", "wet_le_0_pct_ptype", "Share of wet-snow ptype at T2m <= 0 C", "%", "ptype 6 cell-hours", "T2m <= 0 C band / all ptype 6"),
+    Metric("1B Wet snow", "wet_0_to_1_pct_ptype", "Share of wet-snow ptype at 0 < T2m <= 1 C", "%", "ptype 6 cell-hours", "0 < T2m <= 1 C band / all ptype 6"),
+    Metric("1B Wet snow", "wet_1_to_2_pct_ptype", "Share of wet-snow ptype at 1 < T2m <= 2 C", "%", "ptype 6 cell-hours", "1 < T2m <= 2 C band / all ptype 6"),
+    Metric("1B Wet snow", "wet_gt_2_pct_ptype", "Share of wet-snow ptype at T2m > 2 C", "%", "ptype 6 cell-hours", "T2m > 2 C band / all ptype 6"),
     Metric("1B Wet snow", "wet_swe_mean", "Mean snowfall SWE rate", "mm/h", "qualifying wet-snow cell-hours", "mean avg_tsrwe"),
     Metric("1B Wet snow", "wet_swe_p95", "P95 snowfall SWE rate", "mm/h", "qualifying wet-snow cell-hours", "95th percentile avg_tsrwe"),
     Metric("1B Wet snow", "wet_swe_max", "Maximum snowfall SWE rate", "mm/h", "qualifying wet-snow cell-hours", "maximum avg_tsrwe"),
@@ -202,7 +220,7 @@ def pct(a: int, b: int):
     return 100.0 * a / b if b else None
 
 
-def process_region(config_path: Path, root: Path, freeze: float, gust_thr: float, snow_thr: float, start: int | None, end: int | None):
+def process_region(config_path: Path, root: Path, freeze: float, wet_snow_max: float, gust_thr: float, snow_thr: float, start: int | None, end: int | None):
     cfg = json.loads(config_path.read_text(encoding="utf-8"))
     name = cfg.get("display_name") or cfg["region"]
     y0 = int(cfg["years"]["start"])
@@ -241,9 +259,21 @@ def process_region(config_path: Path, root: Path, freeze: float, gust_thr: float
             a.fr_temp_s.add(t[fr])
 
         wet_all = ptype == WET_SNOW_CODE
-        wet = wet_all & (t <= freeze)
+        wet = wet_all & (t <= wet_snow_max)
+
+        # Fixed diagnostic temperature bands make sensitivity transparent,
+        # independent of the chosen headline wet-snow threshold.
+        wet_le_0 = wet_all & (t <= 0.0)
+        wet_0_to_1 = wet_all & (t > 0.0) & (t <= 1.0)
+        wet_1_to_2 = wet_all & (t > 1.0) & (t <= 2.0)
+        wet_gt_2 = wet_all & (t > 2.0)
+
         a.wet_all += int(np.count_nonzero(wet_all))
         a.wet += int(np.count_nonzero(wet))
+        a.wet_le_0 += int(np.count_nonzero(wet_le_0))
+        a.wet_0_to_1 += int(np.count_nonzero(wet_0_to_1))
+        a.wet_1_to_2 += int(np.count_nonzero(wet_1_to_2))
+        a.wet_gt_2 += int(np.count_nonzero(wet_gt_2))
         if np.any(wet):
             x = snow[wet]; a.wet_swe_s.add(x); a.wet_swe_q.add(x)
             a.wet_precip_s.add(precip[wet])
@@ -282,6 +312,11 @@ def process_region(config_path: Path, root: Path, freeze: float, gust_thr: float
         "fr_precip_mean": a.fr_precip_s.mean, "fr_precip_p95": a.fr_precip_q.p(95), "fr_precip_max": a.fr_precip_s.max,
         "fr_high": a.fr_high, "fr_high_pct": pct(a.fr_high, a.fr), "fr_gust_max": a.fr_gust_s.max, "fr_temp_min": a.fr_temp_s.min,
         "wet_all": a.wet_all, "wet": a.wet, "wet_pct": pct(a.wet, a.total), "wet_pct_ptype": pct(a.wet, a.wet_all),
+        "wet_le_0": a.wet_le_0, "wet_0_to_1": a.wet_0_to_1, "wet_1_to_2": a.wet_1_to_2, "wet_gt_2": a.wet_gt_2,
+        "wet_le_0_pct_ptype": pct(a.wet_le_0, a.wet_all),
+        "wet_0_to_1_pct_ptype": pct(a.wet_0_to_1, a.wet_all),
+        "wet_1_to_2_pct_ptype": pct(a.wet_1_to_2, a.wet_all),
+        "wet_gt_2_pct_ptype": pct(a.wet_gt_2, a.wet_all),
         "wet_swe_mean": a.wet_swe_s.mean, "wet_swe_p95": a.wet_swe_q.p(95), "wet_swe_max": a.wet_swe_s.max,
         "wet_precip_mean": a.wet_precip_s.mean, "wet_high": a.wet_high, "wet_high_pct": pct(a.wet_high, a.wet), "wet_gust_max": a.wet_gust_s.max,
         "cold": a.cold, "cold_pct": pct(a.cold, a.total), "lcc_mean": a.cold_lcc_s.mean, "lcc_p75": a.cold_lcc_q.p(75), "lcc_p90": a.cold_lcc_q.p(90),
@@ -331,6 +366,12 @@ def main() -> None:
     p.add_argument("--dataset", action="append", nargs=2, metavar=("CONFIG", "INPUT_ROOT"), help="Repeatable dataset pair; defaults to project Montana + Larisa")
     p.add_argument("--output-dir", type=Path, default=Path("derived/kpis"))
     p.add_argument("--freezing-temp-c", type=float, default=0.0)
+    p.add_argument(
+        "--wet-snow-temp-max-c",
+        type=float,
+        default=2.0,
+        help="Maximum T2m for qualifying wet snow (default: 2.0 C)",
+    )
     p.add_argument("--gust-threshold-ms", type=float, default=18.0)
     p.add_argument("--snowfall-threshold-mmh", type=float, default=0.0)
     p.add_argument("--start-year", type=int)
@@ -341,7 +382,7 @@ def main() -> None:
     results = {}
     region_meta = []
     for cfg, root in datasets:
-        name, values, meta = process_region(Path(cfg), Path(root), args.freezing_temp_c, args.gust_threshold_ms, args.snowfall_threshold_mmh, args.start_year, args.end_year)
+        name, values, meta = process_region(Path(cfg), Path(root), args.freezing_temp_c, args.wet_snow_temp_max_c, args.gust_threshold_ms, args.snowfall_threshold_mmh, args.start_year, args.end_year)
         if name in results:
             raise ValueError(f"Duplicate region name: {name}")
         results[name] = values
@@ -352,6 +393,7 @@ def main() -> None:
         "cell_hour_definition": "one ERA5 grid cell at one hourly timestamp",
         "thresholds": {
             "freezing_temp_c": args.freezing_temp_c,
+            "wet_snow_temp_max_c": args.wet_snow_temp_max_c,
             "gust_threshold_ms": args.gust_threshold_ms,
             "snowfall_threshold_mmh": args.snowfall_threshold_mmh,
             "freezing_liquid_ptype_codes": list(FREEZING_LIQUID_CODES),
