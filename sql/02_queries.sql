@@ -4,8 +4,8 @@
 -- .echo on
 -- .bail on
 
--- sqlite3 local_data/nesc_weather.db < sql/2_queries.sql
--- sqlite3 local_data/nesc_weather.db < sql/2_queries.sql > output.txt
+-- sqlite3 local_data/nesc_weather.db < sql/02_queries.sql
+-- sqlite3 local_data/nesc_weather.db < sql/02_queries.sql > output.txt
 
 -- SELECT
 --     SUM(t2m_c < -2) AS below_minus_2,
@@ -68,7 +68,7 @@
 -- GROUP BY g.cell_id
 -- ORDER BY freezing_rain_cell_hours DESC;
 
-
+-- EXPLAIN QUERY PLAN
 SELECT
     t.time_utc,
     gc.latitude,
@@ -84,11 +84,11 @@ JOIN regions AS r
     ON gc.region_id = r.region_id
 JOIN times AS t
     ON w.time_id = t.time_id
-WHERE r.name = 'Larisa'
+WHERE r.name = 'Montana'
   AND w.ptype_code = 6
   AND w.snowfall_swe_rate_mmh > 3
-  AND gc.latitude BETWEEN 39.75 AND 40.00
-  AND gc.longitude BETWEEN 22.25 AND 22.50
+--   AND gc.latitude BETWEEN 39.75 AND 40.00
+--   AND gc.longitude BETWEEN 22.25 AND 22.50
 ORDER BY
     t.time_utc,
     w.snowfall_swe_rate_mmh DESC;
