@@ -106,3 +106,11 @@ python scripts/build_database.py \
 ```
 
 Each year is loaded in one SQLite transaction. A duplicate cell/time observation is rejected by the schema rather than silently overwritten.
+
+
+python scripts/calculate_kpis.py \
+  --wet-snow-temp-max-c 3 \
+  --output-dir derived/kpis_wet_3
+
+
+python scripts/calculate_kpis_focused_larisa_region.py   --wet-snow-temp-max-c 3   --output-dir derived/kpis_wet_3_focused
