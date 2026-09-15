@@ -23,6 +23,16 @@ derived/
 *.sqlite
 *.sqlite3
 
+# QGIS raster outputs (keep only the empty region placeholders in Git)
+raster_outputs/**
+!raster_outputs/
+!raster_outputs/larisa/
+!raster_outputs/montana/
+!raster_outputs/eugene/
+!raster_outputs/larisa/.gitkeep
+!raster_outputs/montana/.gitkeep
+!raster_outputs/eugene/.gitkeep
+
 # OS/editor
 .DS_Store
 Thumbs.db

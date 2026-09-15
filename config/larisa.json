@@ -1,7 +1,7 @@
 {
   "region": "larisa",
   "display_name": "Larisa",
-  "years": {"start": 1991, "end": 2020},
+  "years": {"start": 1980, "end": 2025},
   "months": [1, 2, 12],
   "area": {"north": 40.25, "west": 21.75, "south": 39.25, "east": 22.75},
   "file_groups": {
