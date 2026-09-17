@@ -35,11 +35,11 @@ import numpy as np
 
 import calculate_kpis as base
 
-LARISA_LAT_MIN = 39.75
-LARISA_LAT_MAX = 39.75
-LARISA_LON_MIN = 22.25
-LARISA_LON_MAX = 22.50
-EXPECTED_LARISA_CELL_COUNT = 2
+LARISA_LAT_MIN = 39.50
+LARISA_LAT_MAX = 40.00
+LARISA_LON_MIN = 22.00
+LARISA_LON_MAX = 22.75
+EXPECTED_LARISA_CELL_COUNT = 12
 
 
 def _normalise_longitudes(longitudes: np.ndarray) -> np.ndarray:
