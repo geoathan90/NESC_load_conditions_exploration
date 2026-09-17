@@ -1,0 +1,38 @@
+{
+  "region": "eugene",
+  "display_name": "Eugene",
+  "years": {
+    "start": 1991,
+    "end": 2020
+  },
+  "months": [
+    1,
+    2,
+    12
+  ],
+  "area": {
+    "north": 44.5,
+    "west": -123.5,
+    "south": 43.5,
+    "east": -122.25
+  },
+  "file_groups": {
+    "instant": [
+      "t2m",
+      "d2m",
+      "tcslw",
+      "lcc",
+      "cbh"
+    ],
+    "ptype": [
+      "ptype"
+    ],
+    "avg": [
+      "avg_tprate",
+      "avg_tsrwe"
+    ],
+    "max": [
+      "fg10"
+    ]
+  }
+}

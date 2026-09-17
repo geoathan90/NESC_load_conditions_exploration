@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Calculate the standard KPI families with Larisa restricted to the line-area ERA5 cells.
+"""Calculate the standard KPI families for Montana, focused Larisa, and Eugene.
 
 This is intentionally a focused companion to calculate_kpis.py.
 
 Hard-coded Larisa spatial bounds:
-    latitude:  39.50 to 40.00 degrees N
-    longitude: 22.00 to 22.75 degrees E
+    latitude:  39.75 degrees N
+    longitude: 22.25 to 22.50 degrees E
 
-On the current 0.25-degree Larisa ERA5 grid this selects 12 cells:
-    latitudes:  39.50, 39.75, 40.00
-    longitudes: 22.00, 22.25, 22.50, 22.75
+On the current 0.25-degree Larisa ERA5 grid this selects 2 cells:
+    latitude:   39.75
+    longitudes: 22.25, 22.50
 
-Montana is left unchanged.
+Montana and Eugene are left spatially unchanged.
 
 Run from the repository root:
     python scripts/calculate_kpis_focused_larisa_region.py
@@ -327,7 +327,7 @@ def main() -> None:
         action="append",
         nargs=2,
         metavar=("CONFIG", "INPUT_ROOT"),
-        help="Repeatable dataset pair; defaults to project Montana + Larisa",
+        help="Repeatable dataset pair; defaults to project Montana + focused Larisa + Eugene",
     )
     p.add_argument(
         "--output-dir",
@@ -350,6 +350,7 @@ def main() -> None:
     datasets = args.dataset or [
         ("config/montana.json", "data/raw/montana"),
         ("config/larisa.json", "data/raw/larisa"),
+        ("config/eugene.json", "data/raw/eugene"),
     ]
 
     results = {}
